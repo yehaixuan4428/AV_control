@@ -8,7 +8,7 @@ global f_br;
 global data;
 [data, f_cl, f_bl, f_br] = genBounds('./SimPkg_F18_V1/SimPkg_F18_V1/TestTrack.mat');
 
-nsteps = 15;
+nsteps = 50;
 %global R;
 
 %1.1
@@ -16,9 +16,11 @@ ub = [repmat([300; 100 ;pi], nsteps, 1); repmat([50;0.5], nsteps-1, 1)];
 lb = [repmat([200; -200 ;-pi], nsteps, 1); repmat([0;-0.5], nsteps-1, 1)];
 
 options = optimoptions('fmincon','SpecifyConstraintGradient',true,...
-                       'SpecifyObjectiveGradient',true, ...
-                       'MaxIter', 500);
-                       %'Display', 'iter');
+                        'FiniteDifferenceType', 'central', ...
+                        'FiniteDifferenceStepSize', 1e-10, ...
+                       'CheckGradients', true,...
+                       'Display', 'iter');
+                       %'MaxIter', 500);
 
 
 cf=@costfun
@@ -29,41 +31,44 @@ i = 1:nsteps;
 xIndex = 3*i-2;
 yIndex = xIndex+1;
 psiIndex = xIndex+2;
-x0(1) = 287;
-x0(2) = -176.0;
+%x0(1) = 287;
+%x0(2) = -176.0;
+%x0(3) = 2.0;
+x0(xIndex) = linspace(287, data.cline(1, 4), nsteps);
+x0(yIndex) = linspace(-176, data.cline(2, 4), nsteps);
 x0(3) = 2.0;
+x0(psiIndex(2:end)) = atan2(x0(yIndex(2:end)), x0(xIndex(2:end)));
+
+%x0(xIndex(2:end)) = 287 + 50*cos(2.0)*(i(2:end) - 1);
+%x0(yIndex(2:end)) = -176 + 50*sin(2.0)*(i(2:end) - 1);
+%x0(psiIndex) = 2.0;
+
+%figure
+%plot(x0(xIndex), x0(yIndex), '-^')
+%hold on
+%plot(data.bl(1,1:15), data.bl(2,1:15), 'x', data.br(1,1:15), data.br(2,1:15), 'x')
+
 i = 1:nsteps-1;
 uIndex = nsteps*3 - 1 + 2*i;
 deltaIndex = uIndex+1;
-x0(uIndex) = 5.0;
+x0(uIndex) = 49.0;
+x0(uIndex(1)) = 5.0;
 Y = [];
 U = [];
 
-nTotalSeg = 10;
-stepSet = [10, 20, 30, 30, 30, 30, 30, 35, 45, 45, 30, 30,30,30];
+nTotalSeg = 1;
+stepSet = [100, 100];
 
 for nSeg = 1:nTotalSeg
     nSeg
-    A = zeros(nsteps*2, 5*nsteps-2);
-    b = zeros(nsteps*2, 1);
-    for i = 1:nsteps
-        A(2*i-1, xIndex(i):yIndex(i)) = -sign(f_bl(nSeg, 1)).*[f_bl(nSeg, 1), -1.0];
-        b(2*i-1) = -sign(f_bl(nSeg, 1)).*(-f_bl(nSeg,2) + f_bl(nSeg,1)*data.bl(1,nSeg+1));
-        A(2*i, xIndex(i):yIndex(i)) = -sign(f_br(nSeg, 1)).*[-f_br(nSeg,1), 1.0];
-        b(2*i) =  -sign(f_br(nSeg, 1)).*(-f_br(nSeg,1)*data.br(1,nSeg+1) + f_br(nSeg,2));
-    end
+
     startState = [x0(1:3), x0(uIndex(1):deltaIndex(1))];
-    z=fmincon(@(z) cf(z, [data.cline(:, nTotalSeg+1);data.theta(nTotalSeg+1)], nsteps), x0,A,b,[],[],lb',ub',@(z) nc(z, nsteps, startState),options);
-    %z=fmincon(@(z) cf(z, [data.cline(:, nSeg+1);data.theta(nSeg+1)], nsteps), x0,A,b,[],[],lb',ub',@(z) nc(z, nsteps, startState),options);
+    z=fmincon(@(z) cf(z, [data.cline(:, 9);data.theta(9)], nsteps), x0,[],[],[],[],lb',ub',@(z) nc(z, nsteps, startState, func{nSeg}, nSeg),options);
     Y0=reshape(z(1:3*nsteps),3,nsteps)';
     U0=reshape(z(3*nsteps+1:end),2,nsteps-1);
     Y = [Y;Y0];
     U = [U,U0];
-    %data.cline(:,nSeg);
-    %data.cline(:,nSeg+1);
-    %Y0(end, 1:2);
-    %nsteps = floor(norm(data.cline(:,nSeg+1) - Y0(end, 1:2))/35.0);
-    nsteps = stepSet(nSeg);
+    %nsteps = stepSet(nSeg);
     i = 1:nsteps;
     xIndex = 3*i-2;
     yIndex = xIndex+1;
@@ -80,29 +85,28 @@ end
 
 %Y0=reshape(z(1:3*nsteps),3,nsteps)';
 %U=reshape(z(3*nsteps+1:end),2,nsteps-1);
-%u=@(t) [interp1(0:dt:(nsteps-2)*dt,U(1,:),t,'previous','extrap');...
-        %interp1(0:dt:(nsteps-2)*dt,U(2,:),t,'previous','extrap')];
+u=@(t) [interp1(0:dt:(nsteps-2)*dt,U(1,:),t,'previous','extrap');...
+        interp1(0:dt:(nsteps-2)*dt,U(2,:),t,'previous','extrap')];
 %Y1 = zeros(nsteps, 3);
 %Y1(1,:) = Y0(1,:);
 %for i = 1:nsteps - 1
     %Y1(i+1, :) = Y1(i,:) + dt.*(odefun(Y1(i,:), u(dt*(i-1))))';
 %end
-
-%[T2,Y2]=ode45(@(t,x) odefun(x,u(t)),[0:dt:(nsteps-1)*dt],x0(1:3));
+[T2,Y2]=ode45(@(t,x) odefun(x,u(t)),[0:dt:(nsteps-1)*dt], [287; -176.0; 2.0]);
 %%plot(Y1(:,1),Y1(:,2));
-%figure
+figure
 %plot(Y0(:,1),Y0(:,2),'x', Y1(:,1),Y1(:,2), 'o', Y2(:,1), Y2(:,2), '^');
 %hold on
-plot(data.bl(1,1:nTotalSeg+1), data.bl(2,1:nTotalSeg+1), 'x', data.br(1,1:nTotalSeg+1), data.br(2,1:nTotalSeg+1), 'x')
+plot(Y(:, 1),Y(:,2), Y2(:,1), Y2(:,2), '--')
 hold on
-plot(Y(:, 1),Y(:,2), 'o')
+plot(data.bl(1,1:15), data.bl(2,1:15), 'x', data.br(1,1:15), data.br(2,1:15), 'x')
 
 %%theta = 0:0.01:2*pi;
 %%hold on
 %%plot((0.7*cos(theta)+3.5),(0.7*sin(theta)-0.5))
 %%hold on
 %%plot(0,0,'x');
-%legend('fmincon', 'ode', 'ode45 trajectory', 'left', 'right');
+legend('fmincon', 'ode45 trajectory', 'left', 'right');
 %%ylim([-2,2]);
 %%xlim([-1,8]);
 %xlabel('x');
@@ -110,7 +114,7 @@ plot(Y(:, 1),Y(:,2), 'o')
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %1.2
-function [g,h,dg,dh]=nonlcon(z, nsteps, startStates )
+function [g,h,dg,dh]=nonlcon(z, nsteps, startStates, interpFunc, idx)
     b = 1.45; 
     L = 2.8;
     dt = 0.01;
@@ -121,9 +125,19 @@ function [g,h,dg,dh]=nonlcon(z, nsteps, startStates )
     xIndex = 3*i-2;
     yIndex = xIndex+1;
     psiIndex = xIndex+2;
+    dg = zeros(5*nsteps - 2, nsteps);
 
-    g = [];
-    dg = [];
+    if idx == 1
+        g = interpFunc(z(xIndex))' - z(yIndex);
+        for i = 1:nsteps
+            dg(xIndex(i):yIndex(i), i) = [2*interpFunc.p1*xIndex(i) + interpFunc.p2; -1.0];
+        end
+    else
+        g = interpFunc(z(yIndex))' - z(xIndex);
+        for i = 1:nsteps
+            dg(xIndex(i):yIndex(i), i) = [-1.0; 2*interpFunc.p1*yIndex(i) + interpFunc.p2];
+        end
+    end
 
     h = zeros(3*nsteps + 2,1);
     h(1:3) = z(xIndex(1):psiIndex(1));
@@ -186,12 +200,14 @@ function [J, dJ] = costfun(z, endPoint, nsteps)
     psiIndex = 3:3:nsteps*3;
     uIndex = nsteps*3+1:2:nsteps*5-2;
     deltaIndex = nsteps*3+2:2:nsteps*5-2;
-    J = sum(  1e-5*((z(xIndex) - endPoint(1)).^2 + (z(yIndex) - endPoint(2)).^2) + (z(psiIndex) - endPoint(3)).^2) + sum(z(deltaIndex).^2);
+    %J = sum(  1e-5*((z(xIndex) - endPoint(1)).^2 + (z(yIndex) - endPoint(2)).^2) + (z(psiIndex) - endPoint(3)).^2) + sum(z(deltaIndex).^2);
+    J = sum(  1e-5*((z(xIndex) - endPoint(1)).^2 + (z(yIndex) - endPoint(2)).^2) + (z(psiIndex) - endPoint(3)).^2);
     dJ = 2.0*z';
     dJ(xIndex) = 1e-5*dJ(xIndex) - 1e-5*endPoint(1)*2;
     dJ(yIndex) = 1e-5*dJ(yIndex) - 1e-5*endPoint(2)*2;
     dJ(psiIndex) = dJ(psiIndex) - endPoint(3)*2;
     dJ(uIndex) = 0.0;
+    dJ(deltaIndex) = 0.0;
 end
 
 
