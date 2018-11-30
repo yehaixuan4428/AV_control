@@ -1,0 +1,4 @@
+%this function is designed as a cntroller for vehicle to perform feedback
+%control alng the generated trjectory
+function main_control
+end
