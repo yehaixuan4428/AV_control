@@ -3,6 +3,8 @@
 %time step is 0.1s
 %number of time steps between two trajectory points are dynamically
 %determined
+clear
+clc
 load TestTrack.mat
 load Pcontroller.mat
 [Traj_ref_x, Traj_ref_y, Traj_ref_psi] = genTrajectory(TestTrack.cline,TestTrack.theta);
@@ -13,7 +15,13 @@ u(:,1) = Pcontroller*([Traj_ref_x(1);Traj_ref_y(1);Traj_ref_psi(1)]-...
         [z(1,1);z(3,1);z(5,1)]);
 for i = 2:length(Traj_ref_x)
     while ~pt_threshold([z(1,end);z(2,end)],[Traj_ref_x(i);Traj_ref_y(i)],[Traj_ref_x(i-1);Traj_ref_y(i-1)])
-        z(:,length(z)+1) = z(:,end)+timestep*vehicle_model(z(:,end),u(:,end));
+        if u(2,end)>0.5
+            u(2,end) = 0.5;
+        elseif u(2,end)<-0.5
+            u(2,end) = -0.5;
+        end
+        dz = vehicle_model(z(:,end),u(:,end));
+        z(:,size(z,2)+1) = z(:,end)+timestep*dz;
     end
 end
 
