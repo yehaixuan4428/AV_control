@@ -3,6 +3,6 @@
 %time step is 0.1s
 %number of time steps between two trajectory points are dynamically
 %determined
-function main_control(TestTrack)
-
-end
+load TestTrack.mat
+[Traj_ref_x, Traj_ref_y, Traj_ref_psi] = genTrajectory(TestTrack);
+timestep = 0.1;
