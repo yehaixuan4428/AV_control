@@ -31,7 +31,9 @@ for i = 2:length(Traj_ref_x)
         end
         dz = vehicle_model(z(:,end),u(:,end));
         z(:,size(z,2)+1) = z(:,end)+timestep*dz;
-        a(size(z,2)+1) = Traj_ref_psi(i)-z(5,end);
+        if z(1,end)>=1471.9
+            break
+        end
         if Traj_ref_psi(i)-z(5,end)>0.18
             Pcontroller(1,2) = 20;
         end
