@@ -43,6 +43,11 @@ for i = 2:length(Traj_ref_x)
         hold on
         axis([200 1600 -200 1000])
     end
+    for j = 1:size(u,2)
+        ROB599_ControlsProject_part1_input(10*j-9:10*j,1) = u(1,j);
+        ROB599_ControlsProject_part1_input(10*j-9:10*j,2) = u(2,j);
+    end
+   
 end
 
 function k = pt_threshold(x,x_d,x_d_b)
