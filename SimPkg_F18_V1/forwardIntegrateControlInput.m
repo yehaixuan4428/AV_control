@@ -29,7 +29,7 @@ if nargin < 2
 end
 
 %generate time vector
-T=0:0.01:(size(U,1)-1)*0.01;
+T=0:0.1:(size(U,1)-1)*0.1;
 
 
 %Solve for trajectory      
